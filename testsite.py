@@ -56,19 +56,17 @@ def manage():
         if request.method == 'GET':
             user = request.args.get('user')
             pword = request.args.get('pword')
-            if authorization(user,pword):
+            action = request.args.get('action')
+            if authorization(user,pword) and action =='status_query':
                 conn = sqlite3.connect('hw_status.db')
                 c = conn.cursor()
                 c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
                 data = c.fetchone()
                 status = data[1]
                 code_to_run = data[4]
-                to_return = {'login':True,'status':'nothing','dbstate':str(data),'command':''}
-                if status == 1:
-                    to_return['command']=code_to_run
-                    c.execute("""UPDATE hw_status SET status=2 WHERE user = ?;""",(user,))
-                conn.commit()
-                conn.close()
+                comm = data[5]
+                
+                to_return = {'login':True,'status':status,'dbstate':str(data),'command':code_to_run,'comm':comm}
                 return jsonify(to_return)
             else:
                 return jsonify({'login':False})
@@ -77,6 +75,12 @@ def manage():
             pword = request.form['pword'] 
             if authorization(user,pword):
                 action = request.form['action']
+                if status == 1: #issueeeeee!!!!!
+                    to_return['command']=code_to_run
+                    to_return['status'] ='code to run'
+                    c.execute("""UPDATE hw_status SET status=2 WHERE user = ?;""",(user,))
+                conn.commit()
+                conn.close()
                 if action == 'test_request':
                     conn = sqlite3.connect('hw_status.db')
                     c = conn.cursor()
@@ -111,7 +115,7 @@ def manage():
                     elif status ==2:
                         message= "Running..."
                     elif status ==3:
-                        c.execute("""UPDATE hw_status SET status=0 WHERE user = ?;""",(user,))
+                        c.execute("""UPDATE hw_status SET status=4 WHERE user = ?;""",(user,))
                         message = "Done: "
                         response = data[5]
                     else:
@@ -153,7 +157,7 @@ def manage():
                     c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 3, ticket,timeo, '',response))
                     conn.commit()
                     conn.close()
-                    return jsonify({'login':True,'status':"Concluded",'dbstate':str(data),'response':response})
+                    return jsonify({'login':True,'status':"Response Submitted",'dbstate':str(data),'response':response})
                 else:
                     return jsonify({'login':False})
         return jsonify({'login':False})
