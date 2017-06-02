@@ -1,5 +1,6 @@
 from flask import Flask
 from flask import request
+from flask import jsonify
 import datetime
 import time
 import sqlite3
@@ -62,15 +63,15 @@ def manage():
                 data = c.fetchone()
                 status = data[1]
                 code_to_run = data[4]
-                to_return = 'nothing_new ' + str(data)
+                to_return = {'login':True,'status':'nothing','dbstate':str(data),'command':''}
                 if status == 1:
-                    to_return = code_to_run
+                    to_return['command']=code_to_run
                     c.execute("""UPDATE hw_status SET status=2 WHERE user = ?;""",(user,))
                 conn.commit()
                 conn.close()
-                return to_return
+                return jsonify(to_return)
             else:
-                return 'Incorrect Login Password'
+                return jsonify({'login':False})
         elif request.method == 'POST': #POST
             user = request.form['user']
             pword = request.form['pword'] 
@@ -83,7 +84,8 @@ def manage():
                     data = c.fetchone()
                     status = data[1]
                     if status != 0:
-                        return "Incomplete Test in Progress"
+                        return jsonify({'login':True,'status':'Incomplete Test Already Running','dbstate':str(data),'response':''})
+
                     timeo = str(time.time())
                     code_to_run = request.form['test_code']
                     ticket = int(10000*random.random())
@@ -95,7 +97,7 @@ def manage():
                     c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 1, ticket,timeo,code_to_run, ''))
                     conn.commit()
                     conn.close()
-                    return 'Submitted...'
+                    return jsonify({'login':True,'status':'Test Submitted','dbstate':str(data),'response':''})
                 elif action == 'status_query':
                     conn = sqlite3.connect('hw_status.db')
                     c = conn.cursor()
@@ -103,16 +105,35 @@ def manage():
                     data = c.fetchone()
                     status = data[1]
                     message = ""
+                    response = ""
                     if status ==1:
                         message= "Queued..."
-                    if status ==2:
+                    elif status ==2:
                         message= "Running..."
-                    if status ==3:
+                    elif status ==3:
                         c.execute("""UPDATE hw_status SET status=0 WHERE user = ?;""",(user,))
-                        message = "Done: "+data[5]
+                        message = "Done: "
+                        response = data[5]
+                    else:
+                        message = "Error"
                     conn.commit()
                     conn.close()
-                    return message
+                    return jsonify({'login':True,'status':message,'dbstate':str(data),'response':response})
+                elif action == 'reset':
+                    conn = sqlite3.connect('hw_status.db')
+                    c = conn.cursor()
+                    c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
+                    data = c.fetchone()
+                    timeo = str(time.time())
+                    c.execute("""UPDATE hw_status SET status=?,time=?,to_execute='',output=? WHERE user = ?;""",(0,timeo,'',user))
+                    conn.commit()
+                    conn.close()
+                    conn = sqlite3.connect('hw_status_archive.db')
+                    c = conn.cursor()
+                    c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 0, 0,timeo, '',''))
+                    conn.commit()
+                    conn.close()
+                    return jsonify({'login':True,'status':"Process Removed",'dbstate':str(data),'response':''})
                 elif action == 'test_response':
                     conn = sqlite3.connect('hw_status.db')
                     c = conn.cursor()
@@ -120,7 +141,7 @@ def manage():
                     data = c.fetchone()
                     status = data[1]
                     if status != 2:
-                        return "Test Aborted"
+                        return jsonify({'login':True,'status':"Test Aborted",'dbstate':str(data),'response':""})
                     timeo = str(time.time())
                     ticket = data[2]
                     response = request.form['response']
@@ -132,9 +153,10 @@ def manage():
                     c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 3, ticket,timeo, '',response))
                     conn.commit()
                     conn.close()
-                    return 'Concluded...'
-                return 'junk'
-        return 'default'
+                    return jsonify({'login':True,'status':"Concluded",'dbstate':str(data),'response':response})
+                else:
+                    return jsonify({'login':False})
+        return jsonify({'login':False})
     except:
         trace = traceback.format_exc()
         return("<pre>" + trace + "</pre>"), 500
