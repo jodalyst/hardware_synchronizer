@@ -12,6 +12,8 @@ application = Flask(__name__)
 application.debug=True
 application.wsgi_app = DebuggedApplication(application.wsgi_app, True)
 
+AUTHENTICATION = False
+
 @application.route("/")
 def hello():
     return "<h1 style='color:blue'>Hello There!</h1>"
@@ -43,6 +45,8 @@ def harvest():
         return("<pre>" + trace + "</pre>"), 500
 
 def authorization(user,pword):
+    if not AUTHORIZATION:
+        return True 
     conn = sqlite3.connect('stuff.db')
     c = conn.cursor()
     c.execute('SELECT * FROM userstuff WHERE user=?',(user,))
@@ -52,114 +56,79 @@ def authorization(user,pword):
 
 @application.route("/hw_supervisor",methods=['GET','POST'])
 def manage():
-    try: 
+    try:
+        pword = 'test'
         if request.method == 'GET':
             user = request.args.get('user')
-            pword = request.args.get('pword')
-            action = request.args.get('action')
+            if AUTHORIZATION:
+                pword = request.args.get('pword')
+            action = request.args.get('command')
             if authorization(user,pword) and action =='status_query':
                 conn = sqlite3.connect('hw_status.db')
                 c = conn.cursor()
                 c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
                 data = c.fetchone()
-                status = data[1]
-                code_to_run = data[4]
-                comm = data[5]
+                state = data[1]
+                hw_command = data[2]
+                hw_response = data[3]
+                server_analysis = data[4]
+                timeo = data[5] 
                 
-                to_return = {'login':True,'status':status,'dbstate':str(data),'command':code_to_run,'comm':comm}
+                to_return = {'login':True,'state':state,'hw_command': hw_command, 'hw_response':hw_response, 'server_analysis': server_analysis, 'time': timeo}
                 return jsonify(to_return)
             else:
                 return jsonify({'login':False})
         elif request.method == 'POST': #POST
             user = request.form['user']
-            pword = request.form['pword'] 
+            if AUTHORIZATION:
+                pword = request.form['pword'] 
             if authorization(user,pword):
-                action = request.form['action']
-                if status == 1: #issueeeeee!!!!!
-                    to_return['command']=code_to_run
-                    to_return['status'] ='code to run'
-                    c.execute("""UPDATE hw_status SET status=2 WHERE user = ?;""",(user,))
+                action = request.form['command']
+                conn = sqlite3.connect('hw_status.db')
+                c = conn.cursor()
+                c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
+                data = c.fetchone()
+                state = data[1]
+                hw_command = data[2]
+                hw_response = data[3]
+                server_analysis = data[4]
+                timeo = data[5] 
+                # new
+                if action == "reset":
+                    state = 0
+                elif state ==0:
+                    if action =="hw_command_request":
+                        hw_command = request.form['hw_comm']
+                        state = 1
+                        timeo = str(time.time())
+                elif state == 1:
+                    if action =="hw_command_retrieval":
+                        state = 2
+                elif state == 2:
+                    if action=="hw_response_provide":
+                        hw_response = request.form['hw_resp']
+                        state = 3
+                elif state == 3:
+                    if action == "server_analysis_provide":
+                        server_analysis = request.form['server_anal']
+                        state = 4
+                elif state == 4:
+                    if action == "server_analysis_retrieval":
+                        state = 0
+                to_return = {'login':True,'state':state,'hw_command': hw_command, 'hw_response':hw_response, 'server_analysis': server_analysis, 'time': timeo}
+                conn = sqlite3.connect('hw_status.db')
+                c = conn.cursor()
+                c.execute("""UPDATE hw_status SET state=?,hw_command=?,hw_response=?,server_analysis=?,time=? WHERE user = ?;""",(state,hw_command,hw_response,server_analysis,timeo,user))
                 conn.commit()
                 conn.close()
-                if action == 'test_request':
-                    conn = sqlite3.connect('hw_status.db')
-                    c = conn.cursor()
-                    c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
-                    data = c.fetchone()
-                    status = data[1]
-                    if status != 0:
-                        return jsonify({'login':True,'status':'Incomplete Test Already Running','dbstate':str(data),'response':''})
-
-                    timeo = str(time.time())
-                    code_to_run = request.form['test_code']
-                    ticket = int(10000*random.random())
-                    c.execute("""UPDATE hw_status SET status=?,ticket=?,time=?,to_execute=?,output='' WHERE user = ?;""",(1,ticket,timeo,code_to_run,user))
-                    conn.commit()
-                    conn.close()
-                    conn = sqlite3.connect('hw_status_archive.db')
-                    c = conn.cursor()
-                    c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 1, ticket,timeo,code_to_run, ''))
-                    conn.commit()
-                    conn.close()
-                    return jsonify({'login':True,'status':'Test Submitted','dbstate':str(data),'response':''})
-                elif action == 'status_query':
-                    conn = sqlite3.connect('hw_status.db')
-                    c = conn.cursor()
-                    c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
-                    data = c.fetchone()
-                    status = data[1]
-                    message = ""
-                    response = ""
-                    if status ==1:
-                        message= "Queued..."
-                    elif status ==2:
-                        message= "Running..."
-                    elif status ==3:
-                        c.execute("""UPDATE hw_status SET status=4 WHERE user = ?;""",(user,))
-                        message = "Done: "
-                        response = data[5]
-                    else:
-                        message = "Error"
-                    conn.commit()
-                    conn.close()
-                    return jsonify({'login':True,'status':message,'dbstate':str(data),'response':response})
-                elif action == 'reset':
-                    conn = sqlite3.connect('hw_status.db')
-                    c = conn.cursor()
-                    c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
-                    data = c.fetchone()
-                    timeo = str(time.time())
-                    c.execute("""UPDATE hw_status SET status=?,time=?,to_execute='',output=? WHERE user = ?;""",(0,timeo,'',user))
-                    conn.commit()
-                    conn.close()
-                    conn = sqlite3.connect('hw_status_archive.db')
-                    c = conn.cursor()
-                    c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 0, 0,timeo, '',''))
-                    conn.commit()
-                    conn.close()
-                    return jsonify({'login':True,'status':"Process Removed",'dbstate':str(data),'response':''})
-                elif action == 'test_response':
-                    conn = sqlite3.connect('hw_status.db')
-                    c = conn.cursor()
-                    c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
-                    data = c.fetchone()
-                    status = data[1]
-                    if status != 2:
-                        return jsonify({'login':True,'status':"Test Aborted",'dbstate':str(data),'response':""})
-                    timeo = str(time.time())
-                    ticket = data[2]
-                    response = request.form['response']
-                    c.execute("""UPDATE hw_status SET status=?,time=?,to_execute='',output=? WHERE user = ?;""",(3,timeo,response,user))
-                    conn.commit()
-                    conn.close()
-                    conn = sqlite3.connect('hw_status_archive.db')
-                    c = conn.cursor()
-                    c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, 3, ticket,timeo, '',response))
-                    conn.commit()
-                    conn.close()
-                    return jsonify({'login':True,'status':"Response Submitted",'dbstate':str(data),'response':response})
-                else:
-                    return jsonify({'login':False})
+                conn = sqlite3.connect('hw_status_archive.db')
+                c = conn.cursor()
+                c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, state, hw_command,hw_response,server_analysis,timeo))
+                conn.commit()
+                conn.close()
+                return jsonify(to_return)
+            else:
+                return jsonify({'login':False})
         return jsonify({'login':False})
     except:
         trace = traceback.format_exc()
