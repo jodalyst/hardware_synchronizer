@@ -14,38 +14,8 @@ application.wsgi_app = DebuggedApplication(application.wsgi_app, True)
 
 AUTHENTICATION = False
 
-@application.route("/")
-def hello():
-    return "<h1 style='color:blue'>Hello There!</h1>"
-
-@application.route("/math",methods=['GET','POST'])
-def test():
-    thing = request.args.get('user')
-    return """<h1 style='color:blue'>Title</h1><p>You name is {}.  That's great.</p>""".format(thing)
-
-@application.route("/logger",methods=['GET','POST'])
-def harvest():
-    try: 
-        #user = request.args.get('user')
-        user = request.form['user']
-        mousex = request.form['mouseX']
-        mousey = request.form['mouseY']
-        scroll = request.form['scroll']
-        focus = request.form['focus']
-        stuff = (mousex,mousey,scroll,focus)
-        timeo = str(datetime.datetime.now())
-        conn = sqlite3.connect('info1.db')
-        c = conn.cursor()
-        c.execute('''INSERT INTO things VALUES (?,?,?)''',(user,timeo,str(stuff)))
-        conn.commit()
-        conn.close()
-        return """all good"""
-    except:
-        trace = traceback.format_exc()
-        return("<pre>" + trace + "</pre>"), 500
-
 def authorization(user,pword):
-    if not AUTHORIZATION:
+    if not AUTHENTICATION:
         return True 
     conn = sqlite3.connect('stuff.db')
     c = conn.cursor()
@@ -60,7 +30,7 @@ def manage():
         pword = 'test'
         if request.method == 'GET':
             user = request.args.get('user')
-            if AUTHORIZATION:
+            if AUTHENTICATION:
                 pword = request.args.get('pword')
             action = request.args.get('command')
             if authorization(user,pword) and action =='status_query':
@@ -80,7 +50,7 @@ def manage():
                 return jsonify({'login':False})
         elif request.method == 'POST': #POST
             user = request.form['user']
-            if AUTHORIZATION:
+            if AUTHENTICATION:
                 pword = request.form['pword'] 
             if authorization(user,pword):
                 action = request.form['command']
@@ -111,8 +81,8 @@ def manage():
                 elif state == 3:
                     if action == "server_analysis_provide":
                         server_analysis = request.form['server_anal']
-                        state = 4
-                elif state == 4:
+                        state = 0
+                elif state == 4: #deprecated...not used any more (6/06/2017)
                     if action == "server_analysis_retrieval":
                         state = 0
                 to_return = {'login':True,'state':state,'hw_command': hw_command, 'hw_response':hw_response, 'server_analysis': server_analysis, 'time': timeo}
