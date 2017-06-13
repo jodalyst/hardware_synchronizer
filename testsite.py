@@ -29,10 +29,16 @@ def manage():
     try:
         pword = 'test'
         if request.method == 'GET':
-            user = request.args.get('user')
+            try:
+                user = request.args.get('user')
+            except: #failed to find username
+                return jsonify({'login':False})
             if AUTHENTICATION:
                 pword = request.args.get('pword')
-            action = request.args.get('command')
+            try:
+                action = request.args.get('command')
+            except: #failed to specify query
+                return jsonify({'login':False})
             if authorization(user,pword) and action =='status_query':
                 conn = sqlite3.connect('hw_status.db')
                 c = conn.cursor()
