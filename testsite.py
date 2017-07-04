@@ -14,6 +14,116 @@ application.wsgi_app = DebuggedApplication(application.wsgi_app, True)
 
 AUTHENTICATION = False
 
+@application.route("/")
+def hello():
+    return "<h1 style='color:blue'>Hello There!</h1>"
+
+@application.route("/math",methods=['GET','POST'])
+def test():
+    thing = request.args.get('user')
+    return """<h1 style='color:blue'>Awesome Test Site (sanity check)</h1><p>You name is {}.  That's great.</p>""".format(thing)
+
+
+mostec_db = 'mostec_17_w1.db'
+#below is intended for 2017 blue math resource allocating
+@application.route("/mostec_logger",methods=['GET','POST'])
+def mostecharvest():
+    try: 
+        if request.method == 'POST': #POST
+            stuff = request.get_json()
+            user = stuff['user']
+            timeo = str(time.time())
+            conn = sqlite3.connect(mostec_db)
+            c = conn.cursor()
+            c.execute("INSERT INTO userlogs VALUES (?,?,?)",(timeo,user,str(stuff)))
+            conn.commit()
+            conn.close()
+        """user = request.form['user']
+        #user = request.args.get('user')
+        user = request.form['user']
+        mousex = request.form['mouseX']
+        mousey = request.form['mouseY']
+        scroll = request.form['scroll']
+        focus = request.form['focus']
+        stuff = (mousex,mousey,scroll,focus)
+        timeo = str(datetime.datetime.now())
+        conn = sqlite3.connect('info1.db')
+        c = conn.cursor()
+        c.execute('''INSERT INTO things VALUES (?,?,?)''',(user,timeo,str(stuff)))
+        conn.commit()
+        conn.close()
+        """
+        return """ all good"""
+    except:
+        trace = traceback.format_exc()
+        return("<pre>" + trace + "</pre>"), 500
+
+math_db = 'blue_17_w1.db'
+#below is intended for 2017 blue math resource allocating
+@application.route("/bluemath_logger",methods=['GET','POST'])
+def blueharvest():
+    try: 
+        if request.method == 'POST': #POST
+            stuff = request.get_json()
+            user = stuff['user']
+            timeo = str(time.time())
+            conn = sqlite3.connect(math_db)
+            c = conn.cursor()
+            c.execute("INSERT INTO userlogs VALUES (?,?,?)",(timeo,user,str(stuff)))
+            conn.commit()
+            conn.close()
+        """user = request.form['user']
+        #user = request.args.get('user')
+        user = request.form['user']
+        mousex = request.form['mouseX']
+        mousey = request.form['mouseY']
+        scroll = request.form['scroll']
+        focus = request.form['focus']
+        stuff = (mousex,mousey,scroll,focus)
+        timeo = str(datetime.datetime.now())
+        conn = sqlite3.connect('info1.db')
+        c = conn.cursor()
+        c.execute('''INSERT INTO things VALUES (?,?,?)''',(user,timeo,str(stuff)))
+        conn.commit()
+        conn.close()
+        """
+        return """ all good"""
+    except:
+        trace = traceback.format_exc()
+        return("<pre>" + trace + "</pre>"), 500
+
+@application.route("/logger",methods=['GET','POST'])
+def harvest():
+    try: 
+        if request.method == 'POST': #POST
+            stuff = request.get_json()
+            user = stuff['user']
+            timeo = str(time.time())
+            conn = sqlite3.connect('major_log.db')
+            c = conn.cursor()
+            c.execute("INSERT INTO userlogs VALUES (?,?,?)",(timeo,user,str(stuff)))
+            conn.commit()
+            conn.close()
+        """user = request.form['user']
+        #user = request.args.get('user')
+        user = request.form['user']
+        mousex = request.form['mouseX']
+        mousey = request.form['mouseY']
+        scroll = request.form['scroll']
+        focus = request.form['focus']
+        stuff = (mousex,mousey,scroll,focus)
+        timeo = str(datetime.datetime.now())
+        conn = sqlite3.connect('info1.db')
+        c = conn.cursor()
+        c.execute('''INSERT INTO things VALUES (?,?,?)''',(user,timeo,str(stuff)))
+        conn.commit()
+        conn.close()
+        """
+        return """ all good"""
+    except:
+        trace = traceback.format_exc()
+        return("<pre>" + trace + "</pre>"), 500
+
 def authorization(user,pword):
     if not AUTHENTICATION:
         return True 
@@ -29,21 +139,18 @@ def manage():
     try:
         pword = 'test'
         if request.method == 'GET':
-            try:
-                user = request.args.get('user')
-            except: #failed to find username
-                return jsonify({'login':False})
+            user = request.args.get('user')
             if AUTHENTICATION:
                 pword = request.args.get('pword')
-            try:
-                action = request.args.get('command')
-            except: #failed to specify query
-                return jsonify({'login':False})
+            action = request.args.get('command')
             if authorization(user,pword) and action =='status_query':
                 conn = sqlite3.connect('hw_status.db')
                 c = conn.cursor()
                 c.execute('SELECT * FROM hw_status WHERE user=? ORDER BY rowid DESC LIMIT 1;', (user,))
                 data = c.fetchone()
+                if data == None:
+                    to_return = {'login':True,'state':0,'hw_command': '', 'hw_response':'', 'server_analysis': '', 'time': ''}
+                    return jsonify(to_return)
                 state = data[1]
                 hw_command = data[2]
                 hw_response = data[3]
@@ -88,7 +195,7 @@ def manage():
                     if action == "server_analysis_provide":
                         server_analysis = request.form['server_anal']
                         state = 0
-                elif state == 4: #deprecated...not used any more (6/06/2017)
+                elif state == 4:
                     if action == "server_analysis_retrieval":
                         state = 0
                 to_return = {'login':True,'state':state,'hw_command': hw_command, 'hw_response':hw_response, 'server_analysis': server_analysis, 'time': timeo}
@@ -99,7 +206,7 @@ def manage():
                 conn.close()
                 conn = sqlite3.connect('hw_status_archive.db')
                 c = conn.cursor()
-                c.execute("INSERT INTO "+user+" VALUES (?,?,?,?,?,?)", (user, state, hw_command,hw_response,server_analysis,timeo))
+                c.execute('INSERT INTO "'+user+'" VALUES (?,?,?,?,?,?)', (user, state, hw_command,hw_response,server_analysis,timeo))
                 conn.commit()
                 conn.close()
                 return jsonify(to_return)

@@ -15,9 +15,8 @@ CHECKING_PERIOD = 5 #seconds
 timing = time.time()
 PROCESS_TIMEOUT = 10
 
-lcl = '/home/pi/mites17'
+lcl = './'
 hal = 'https://eesjs1.net/testsite/hw_supervisor'
-
 
 while True:
     print("Here")
@@ -25,7 +24,7 @@ while True:
         print("waiting")
         time.sleep(1)
     timing = time.time()
-    uname,password = [i.strip() for i in open(os.path.expanduser(lcl+'/.catsoop_login'))]
+    uname,password = [i.strip() for i in open(os.path.expanduser(lcl+'/catsoop_login'))]
     payload = {'user': uname, 'pword': password,'command':'status_query'}
     try:
         print('requesting')
@@ -41,7 +40,7 @@ while True:
             print(r)
             k = json.loads(r.text)
             data = k['hw_command']
-            p = Popen(['python', '-'],stdin=PIPE,stdout=PIPE,stderr=PIPE)
+            p = Popen(['python3', '-'],stdin=PIPE,stdout=PIPE,stderr=PIPE)
             print('about to run')
             try:
                 outs, errs = p.communicate(input=data.encode(),timeout=PROCESS_TIMEOUT)
