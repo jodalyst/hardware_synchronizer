@@ -1,5 +1,33 @@
 # hardware_synchronizer
-Python-Based Hardware Monitor for Education Users (Flask-Based Version)
+
+This is an on-going project/repo that I'm using to carry out some experiments in sychronizing some low-throughput hardware synchronization needs in both research and educational settings.  The primary structure is a basic, standa-alone archictecture for holding, distributing, and logging commands and responses between a master computer and remote worker computers, which are assumed to be distributed, small, "IOT" (shudder)-style devices such as single-board computers, microcontrollers, or even other traditional "computers."  
+
+
+
+```
+            +---------------+
+            | Central Server|
+            |  testsite.py  |
+            +---------------+
+                    ^
+                    |
+                    |
+           +--------+---------+----....
+           |                  |
+          \/                  \/
+     +-----+--------+   +-----+--------+
+     | Distributed 1|   | Distributed 2|
+     | heartbeat.py |   | heartbeat.py |
+     +--------------+   +--------------+
+
+```
+
+This structure is nothing groundbreaking, and is basically how lots of the internet works, but a ready implementation of what I need doesn't exist so this is more about polishing and specifying up a structure.
+ 
+## Development Version:
+Current Repo contains Python-Based backend Hardware Monitor for Education Users (Flask-Based Version).  Commands can be inputted to the system via http `POST` commands that can be executed (currently using Python only) on any listening system. Outputs will be generated and reported back and then any user is free to assess those responses.  
+
+Functioning distributions are found <a href="https://github.com/jodalyst/mostec17" target="_blank">here</a> and a slightly older version (that still works) <a href="https://github.com/jodalyst/mites17" target="_blank">here</a>
 
 **Working notes below**
 
@@ -16,7 +44,7 @@ The database has the following things in it:
 * `login`: whether you are logged in or not (not used right now)
 
 
-All GET and POST requests return the status (db) fields for that particular piece of hardware.
+All `GET` and `POST` requests return the status (db) fields for that particular piece of hardware.
 
 
 GET (does not modify system state):
